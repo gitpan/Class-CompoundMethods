@@ -1,23 +1,28 @@
 package Class::CompoundMethods;
 
-use 5.006;
 use strict;
-use warnings;
 use vars qw(@ISA @EXPORT_OK $VERSION %METHODS);
 
 require Exporter;
 
 @ISA = qw(Exporter);
 @EXPORT_OK = qw(append_method prepend_method method_list);
-$VERSION = '0.01';
+$VERSION = '0.02';
 
 sub method_list {
+    # Modifying the targets array only works when the stub function is
+    # installed into the method slot. I haven't documented this function
+    # and you shouldn't be using it ... unless you modify ->x_method to always
+    # install the stub method in which case it becomes safe to count on
+    # ->method_list.
     my $method_name = shift;
     return () unless exists $METHODS{$method_name};
     return $METHODS{$method_name}{'targets'};
 }
 
 sub prepend_method {
+    # This takes a method and inserts before all other methods into the method
+    # slot.
     my $method_name = shift;
     my $method_to_install = shift;
 
@@ -29,6 +34,7 @@ sub prepend_method {
 }
 
 sub append_method {
+    # This takes a method and adds it onto the end of all previous methods
     my $method_name = shift;
     my $method_to_install = shift;
 
@@ -40,13 +46,34 @@ sub append_method {
 }
 
 sub x_method {
+    # This is a general function used by ->prepend_method and ->append_method
+    # to alter a method slot. The four arguements are the method name to
+    # install, the slot to write to and two functions for managing the
+    # ->{'targets'} array.
+
+    # method_name:
+    # This may be either a fully qualified or unqualified method name.
+    #  eg: 'GreenPartyDB::Database::person::pre_insert'
+    #      vs
+    #      'pre_insert' (and the calling method was done from within the
+    #       'GreenPartyDB::Database::person' namespace)
+    #
+    # Perhaps in the future it would be useful to also support methods in
+    # the form 'package->method' /^ ([^ -]*) \s* -> \s* ([\w+])/x .
+
+    # method_to_install:
+    # This may be either an fully qualified/unqualified method name or a code
+    # reference.
+
+    # add_method:
+
+    # existing_method:
     my %p = @_;
     my $method_name = $p{'method_name'};
     my $method_to_install = $p{'method_to_install'};
     my $add_method = $p{'add_method'};
     my $existing_method = $p{'existing_method'};
     no strict 'refs';
-    no warnings 'redefine';
 
     # If the method name isn't qualified then I assume it exists in the
     # caller's package.
@@ -85,15 +112,18 @@ sub x_method {
 
     $add_method->( $methods_to_call, $method_to_install );
 
-    # Install the new methods
-    if (*{$method_name}{CODE}) {
-        # Already existing method
-        *{$method_name} = sub {
-            $_[0]->$_( @_[1 .. $#_] ) for @$methods_to_call;
-        };
-    } else {
-        # Single method - no special calling
-        *{$method_name} = $method_to_install;
+    {
+        local $^W;
+        # Install the new methods
+        if (*{$method_name}{CODE}) {
+            # Already existing method
+            *{$method_name} = sub {
+                $_[0]->$_( @_[1 .. $#_] ) for @$methods_to_call;
+            };
+        } else {
+            # Single method - no special calling
+            *{$method_name} = $method_to_install;
+        }
     }
 
     # Keep a copy of the installed hook so it can be ignored later.

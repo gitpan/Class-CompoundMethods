@@ -2,7 +2,9 @@ Changes
 LICENSE
 MANIFEST
 Makefile.PL
+META.yml                                Module meta-data (added by MakeMaker)
 README
+SIGNATURE
 eg/alzabo.pl
 eg/simple.pl
 lib/Class/CompoundMethods.pm

@@ -1,5 +1,5 @@
 use strict;
-use warnings;
+BEGIN { $^W = 1 }
 use Test;
 BEGIN { plan tests => 2 }
 use Class::CompoundMethods qw(append_method method_list);
