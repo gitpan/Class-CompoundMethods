@@ -1,0 +1,14 @@
+Changes
+LICENSE
+MANIFEST
+Makefile.PL
+README
+eg/alzabo.pl
+eg/simple.pl
+lib/Class/CompoundMethods.pm
+t/00basic.t
+t/01append.t
+t/02prex.t
+t/03prepend.t
+t/04prepex.t
+t/05listm.t

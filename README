@@ -1,0 +1,108 @@
+NAME
+    Class::CompoundMethods - Create methods from components
+
+SYNOPSIS
+      use Class::CompoundMethods 'append_method';
+
+      # This installs both versioning_hook and auditing_hook into the
+      # method Object::pre_insert.
+      for my $hook (qw(versioning auditing)) {
+          append_method( 'Object::pre_insert', "${hook}_hook" );
+      }
+
+      sub versioning_hook { ... }
+      sub auditing_hook { ... }
+
+DESCRIPTION
+    This allows you to install more than one method into a single method
+    name. I created this so I could install both versioning and auditing
+    hooks into another module's object space. So instead of creating a
+    single larger method which incorporates the functionality of both hooks
+    I created "Class::CompoundMethods::append_method" to install a wrapper
+    method as needed.
+
+    If only one method is ever installed into a space, it is installed
+    directly with no wrapper. If you install more than one then
+    "append_method" creates a wrapper which calls each of the specified
+    methods in turn.
+
+PUBLIC METHODS
+    append_method
+         append_method( $method_name, $method );                
+
+        This function takes two parameters - the fully qualified name of the
+        method to install into and the method to install.
+
+        "$method_name" must be the fully qualified method name. This means
+        that for the method "pre_insert" of a "Foo::Bar" object you must
+        pass in
+
+        "'Foo::Bar::pre_insert'".
+
+        "$method" may be either a code reference or the fully qualified name
+        of the method to use.
+
+  EXAMPLES
+
+    Example 1
+         use Class::CompoundMethods 'append_method';
+
+         # This installs both versioning_hook and auditing_hook into the
+         # method Object::pre_insert.
+         for my $hook (qw(versioning auditing)) {
+             append_method( 'Object::pre_insert', "${hook}_hook" );
+         }
+
+         sub versioning_hook { ... }
+         sub auditing_hook { ... }
+
+    Example 2
+         use Class::CompoundMethods 'append_method';
+
+         my @versioned_tables = ( .... );
+         my @audited_tables = ( .... );
+
+         for my $table_list ( { tables => \ @versioned_tables,
+                                prefix => 'versioned' },
+                              { tables => \ @audited_tables,
+                                prefix => 'audited' } ) {
+             my $tables = $table_list->{'tables'};
+             my $prefix = $table_list->{'prefix'};
+
+             for my $table ( @$tables ) {
+                 for my $hook ( qw[pre_insert pre_update pre_delete]) {
+
+                     my $method_name = "GreenPartyDB::Database::${table}::${hook}";
+                     my $method_inst = __PACKAGE__ . "::${prefix}_${hook}";
+                     append_method( $method_name, $method_inst );
+
+                 }
+             }
+         }
+
+         sub versioned_pre_insert { ... }
+         sub versioned_pre_update { ... }
+         sub versioned_pre_delete { ... }
+         sub audited_pre_insert { ... }
+         sub audited_pre_update { ... }
+         sub audited_pre_delete { ... }
+
+  EXPORT
+
+    This class optionally exports the "append_method" function.
+
+COPYRIGHT & LICENSE
+    Copyright (c) 2003 Joshua b. Jore All rights reserved. This program is
+    free software; you can redistribute it and/or modify it under the same
+    terms as Perl itself.
+
+AUTHOR
+    Joshua b. Jore <jjore@cpan.org>
+
+SEE ALSO
+    RFC Class::AppendMethods
+    http://www.perlmonks.org/index.pl?node_id=252199
+
+    Installing chained methods
+    http://www.perlmonks.org/index.pl?node_id=251908
+

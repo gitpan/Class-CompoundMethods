@@ -1,0 +1,6 @@
+Revision history for Perl extension Class::CompoundMethods.
+
+0.01  Mon Apr 21 23:17:58 2003
+	- original version; created by h2xs 1.5 with options
+		-X -n Class::CompoundMethods -v 0.01
+
