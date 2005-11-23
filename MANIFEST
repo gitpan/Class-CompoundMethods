@@ -12,6 +12,7 @@ SIGNATURE
 t/00signature.t
 t/01pod.t
 t/02pod-coverage.t
+t/03yaml.t
 t/10basic.t
 t/20append.t
 t/21prepend.t

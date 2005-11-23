@@ -13,3 +13,6 @@ Revision history for Perl extension Class::CompoundMethods.
 	- Refactoring.
 	- Faster hook method?
 	- Lots more debugging info
+0.04  Wed Nov 23, 2005
+        - Added t/03yaml.t
+        - Fixed META.yml syntax

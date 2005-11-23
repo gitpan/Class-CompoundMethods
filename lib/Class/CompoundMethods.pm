@@ -20,11 +20,11 @@ Class::CompoundMethods - Create methods from components
 
 =head1 VERSION
 
-0.03
+0.04
 
 =cut
 
-$VERSION = '0.03';
+$VERSION = '0.04';
 
 =pod
 
@@ -207,7 +207,7 @@ same terms as Perl itself.
 
 =head1 AUTHOR
 
-Joshua ben Jore <jjore@cpan.org>
+"Joshua ben Jore" <jjore@cpan.org>
 
 =head1 SEE ALSO
 

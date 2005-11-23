@@ -1,8 +1,17 @@
---- #YAML:1.0
+---
 name: Class-CompoundMethods
-version: 0.03
+version: 0.04
 author:
-  - "Joshua ben Jore" <jjore@cpan.org>
+  - '"Joshua ben Jore" <jjore@cpan.org>'
 abstract: Create methods from components
 license: perl
-generated_by: Module::Build version 0.2611, without YAML.pm
+requires:
+  B: 0
+  Exporter: 0
+  strict: 0
+  vars: 0
+provides:
+  Class::CompoundMethods:
+    file: lib/Class/CompoundMethods.pm
+    version: 0.04
+generated_by: Module::Build version 0.2611
