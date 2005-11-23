@@ -1,55 +1,248 @@
 package Class::CompoundMethods;
 
 use strict;
-use vars qw(@ISA @EXPORT_OK $VERSION %METHODS);
+use vars qw($VERSION @EXPORT_OK %EXPORT_TAGS %METHODS);
 
-require Exporter;
+use Exporter ();
+*import      = \&Exporter::import;
+@EXPORT_OK   = qw(append_method prepend_method );
+%EXPORT_TAGS = ( all => \@EXPORT_OK );
 
-@ISA = qw(Exporter);
-@EXPORT_OK = qw(append_method prepend_method method_list);
-$VERSION = '0.02';
+use B qw( svref_2object );
 
-sub method_list {
-    # Modifying the targets array only works when the stub function is
-    # installed into the method slot. I haven't documented this function
-    # and you shouldn't be using it ... unless you modify ->x_method to always
-    # install the stub method in which case it becomes safe to count on
-    # ->method_list.
-    my $method_name = shift;
-    return () unless exists $METHODS{$method_name};
-    return $METHODS{$method_name}{'targets'};
-}
+# use Smart::Comments;
 
-sub prepend_method {
-    # This takes a method and inserts before all other methods into the method
-    # slot.
-    my $method_name = shift;
-    my $method_to_install = shift;
+=pod
 
-    return x_method(
-        method_name => $method_name,
-        method_to_install  => $method_to_install,
-	add_method => sub { unshift @{$_[0]}, $_[1] },
-        existing_method => sub { unshift @{$_[0]}, $_[1] } );
-}
+=head1 NAME
+
+Class::CompoundMethods - Create methods from components
+
+=head1 VERSION
+
+0.03
+
+=cut
+
+$VERSION = '0.03';
+
+=pod
+
+=head1 SYNOPSIS
+
+  package Object;
+  use Class::CompoundMethods 'append_method';
+
+  # This installs both versioning_hook and auditing_hook into the
+  # method Object::pre_insert.
+  append_method( pre_insert => "versioning_hook" );
+  append_method( pre_insert => "auditing_hook" );
+
+=head1 DESCRIPTION
+
+This allows you to install more than one method into a single method
+name.  I created this so I could install both versioning and auditing
+hooks into another module's object space. So instead of creating a
+single larger method which incorporates the functionality of both
+hooks I created C<append_method()>/C<insert_method()> to install a
+wrapper method as needed.
+
+If only one method is ever installed into a space, it is installed
+directly with no wrapper. Once there are two or more components, a
+hook method is installed which will call each component in order.
+
+=head1 PUBLIC METHODS
+
+=over 4
+
+=item append_method( $method_name, $method )
+
+ append_method( $method_name, $method );
+
+This function takes two parameters - a method name and the method to install.
+
+C<$method_name> may be fully qualified. If not, Class::CompoundMethods
+looks for your method in your current package.
+
+ append_method( 'Object::something', ... );
+ append_method( 'something', ... );
+
+C<$method> may be either a code reference or a method name. It may be
+fully qualified.
+
+ append_method( ..., sub { ... } );
+ append_method( ..., \ &some_hook );
+ append_method( ..., 'Object::some_hook' );
+ append_method( ..., 'some_hook' );
+
+=cut
 
 sub append_method {
-    # This takes a method and adds it onto the end of all previous methods
-    my $method_name = shift;
-    my $method_to_install = shift;
 
-    return x_method(
-        method_name => $method_name,
-        method_to_install  => $method_to_install,
-	add_method => sub { push @{$_[0]}, $_[1] },
-        existing_method => sub { unshift @{$_[0]}, $_[1] } );
+    # This takes a method and adds it onto the end of all previous methods
+    my ( $method_name, $method_to_install ) = @_;
+
+    return _x_method(
+        {   method_name       => $method_name,
+            method_to_install => $method_to_install,
+            add_method        => \&_append_method,
+            existing_method   => \&_append_method,
+        }
+    );
 }
 
-sub x_method {
-    # This is a general function used by ->prepend_method and ->append_method
-    # to alter a method slot. The four arguements are the method name to
-    # install, the slot to write to and two functions for managing the
-    # ->{'targets'} array.
+=pod
+
+
+=item prepend_method( $method_name, $method )
+
+ prepend_method( $method_name, $method );
+
+This function takes two parameters - a method name and the method to install.
+
+C<$method_name> may be fully qualified. If not, Class::CompoundMethods
+looks for your method in your current package.
+
+ prepend_method( 'Object::something', ... );
+ prepend_method( 'something', ... );
+
+C<$method> may be either a code reference or a method name. It may be
+fully qualified.
+
+ prepend_method( ..., sub { ... } );
+ prepend_method( ..., \ &some_hook );
+ prepend_method( ..., 'Object::some_hook' );
+ prepend_method( ..., 'some_hook' );
+
+=cut
+
+sub prepend_method {
+
+    # This takes a method and inserts before all other methods into the method
+    # slot.
+    my ( $method_name, $method_to_install ) = @_;
+
+    return _x_method(
+        {   method_name       => $method_name,
+            method_to_install => $method_to_install,
+            add_method        => \&_prepend_method,
+            existing_method   => \&_prepend_method,
+        }
+    );
+}
+
+# =pod
+#
+# =item method_list( $method_name )
+#
+# =cut
+#
+# sub method_list {
+#
+#     # Modifying the $METHODS{...} array only works when the stub function is
+#     # installed into the method slot. I haven't documented this
+#     # function and you shouldn't be using it ... unless you modify
+#     # ->_x_method to always install the stub method in which case it
+#     # becomes safe to count on ->method_list.
+#     my ($method_name) = @_;
+#
+#     return $METHODS{$method_name} || [];
+# }
+
+=back
+
+=head2 EXAMPLES
+
+=over 4
+
+=item Example 1
+
+ use Class::CompoundMethods qw(append_method);
+
+ # This installs both versioning_hook and auditing_hook into the
+ # method Object::pre_insert.
+ append_method( 'Object::something' => \ &versioning_hook );
+
+ package Object;
+ prepend_method( 'something' => \ &auditing_hook );
+
+=item Example 2
+
+ package GreenPartyDB::Database;
+ use Class::CompoundMethods qw(append_method);
+
+ my @versioned_tables = ( ... );
+ my @audited_tables = ( ... );
+ 
+ for my $table ( @versioned_tables ) {
+    my $package = __PACKAGE__ . "::" . $table;
+    append_method( $package . "::pre_insert", \ &versioning_hook );
+    append_method( $package . "::pre_update", \ &versioning_hook );
+    append_method( $package . "::pre_delete", \ &versioning_hook );
+ }
+
+ for my $table ( @audited_tables ) {
+    my $package = __PACKAGE__ . "::" . $table;
+    append_method( $package . "::pre_insert", \ &auditing_hook );
+    append_method( $package . "::pre_update", \ &auditing_hook );
+    append_method( $package . "::pre_delete", \ &auditing_hook );
+ }
+
+=back
+
+=head2 EXPORT
+
+This class optionally exports the C<append_method> and
+C<prepend_method> functions. It also uses the ':all' tag.
+
+ use Class::CompoundMethods qw( append_method );
+
+ use Class::CompoundMethods qw( :all );
+
+=head1 COPYRIGHT & LICENSE
+
+Copyright (c) 2005 Joshua ben Jore All rights reserved.  This program
+is free software; you can redistribute it and/or modify it under the
+same terms as Perl itself.
+
+=head1 AUTHOR
+
+Joshua ben Jore <jjore@cpan.org>
+
+=head1 SEE ALSO
+
+RFC Class::AppendMethods L<http://www.perlmonks.org/index.pl?node_id=252199>
+
+Installing chained methods L<http://www.perlmonks.org/index.pl?node_id=251908>
+
+=cut
+
+## PRIVATE FUNCTIONS
+
+sub _append_method {
+    my ($p) = @_;
+    push @{ $p->{stash} }, $p->{method};
+    return;
+}
+
+sub _prepend_method {
+    my ($p) = @_;
+    unshift @{ $p->{stash} }, $p->{method};
+    return;
+}
+
+sub _function_package {
+    my ($sub) = @_;
+
+    return eval { svref_2object($sub)->STASH->NAME; };
+}
+
+sub _x_method {
+
+    # This is a general function used by ->prepend_method and
+    # ->append_method to alter a method slot. The four arguments are
+    # the method name to install, the slot to write to and two
+    # functions for managing the $METHODS{...} array.
 
     # method_name:
     # This may be either a fully qualified or unqualified method name.
@@ -68,195 +261,116 @@ sub x_method {
     # add_method:
 
     # existing_method:
-    my %p = @_;
-    my $method_name = $p{'method_name'};
-    my $method_to_install = $p{'method_to_install'};
-    my $add_method = $p{'add_method'};
-    my $existing_method = $p{'existing_method'};
+    my ($p) = @_;
+    my ( $method_name, $method_to_install, $add_method, $existing_method )
+        = @{$p}
+        {qw(method_name method_to_install add_method existing_method )};
+
+    # Get the package of the user of Class::CompoundMethods.
+    my ( $package, $filename, $line );
+    {
+
+        # Look upwards in the call stack until I either run out of
+        # stack or find something that isn't from this package.
+        my $cx = 1;
+        ++$cx until __PACKAGE__ ne caller $cx;
+        ( $package, $filename, $line ) = caller $cx;
+
+        ### Context: $cx
+    }
+
     no strict 'refs';
+    local $^W;
 
     # If the method name isn't qualified then I assume it exists in the
     # caller's package.
-    unless ($method_name =~ /::/) {
-        $method_name = caller(1) . "::$method_name";
+    unless ( $method_name =~ /::/ ) {
+        ### Fixing up target $method_name from $package
+        $method_name = "${package}::$method_name";
     }
+
+    ### Target method name: $method_name
 
     # If I was given a method name then fetch the code
     # reference from the named slot
-    unless (ref $method_to_install ) {
+    unless ( ref $method_to_install ) {
+
         # If the method is not qualified with a package name then grab the
         # method from the caller's own package.
-        unless ($method_to_install =~ /::/) {
-            $method_to_install = caller(1) . "::$method_to_install";
+        unless ( $method_to_install =~ /::/ ) {
+            ### Fixing up source: $method_to_install, from: $package
+            $method_to_install = "${package}::$method_to_install";
         }
-        
-        # symref
-        $method_to_install = \&{$method_to_install};
+
+        ### Source symref: $method_to_install
+        defined &$method_to_install
+            or die "Couldn't get $method_to_install in $filename at $line.\n";
+
+        $method_to_install = \&$method_to_install;
     }
 
     # Track the list of references to install
-    unless (exists $METHODS{$method_name}) {
-        $METHODS{$method_name} = { targets => [],
-                                   hook    => undef };
-    }
-    my $methods_to_call = $METHODS{$method_name}{'targets'};
-    my $hook_method     = $METHODS{$method_name}{'hook'};
+    my $methods_to_call = $METHODS{$method_name} ||= [];
 
-    # If the pre-existing method isn't in the local cache then copy it over
-    # first. (be sure to ignore the hook method too)
-    if (*{$method_name}{CODE} and
-        not( grep $_ == *{$method_name}{CODE},
-             grep defined(), @$methods_to_call, $hook_method ) ) {
-        $existing_method->( $methods_to_call, *{$method_name}{CODE} );
-    }
-
-    $add_method->( $methods_to_call, $method_to_install );
-
+    # Protect against clobbering whatever was there previously. Its ok
+    # to clobber it if its just the hook method or if its already in
+    # the list of things C::CM knows to call as a component.
+    if (    defined &$method_name
+        and ( __PACKAGE__ ne _function_package( \&$method_name ) )
+        and not scalar grep { $_ == \&$method_name } @$methods_to_call )
     {
-        local $^W;
-        # Install the new methods
-        if (*{$method_name}{CODE}) {
-            # Already existing method
-            *{$method_name} = sub {
-                $_[0]->$_( @_[1 .. $#_] ) for @$methods_to_call;
-            };
-        } else {
-            # Single method - no special calling
-            *{$method_name} = $method_to_install;
-        }
+        ### Saving original method
+        $existing_method->(
+            {   stash    => $methods_to_call,
+                method   => \&$method_name,
+                package  => $package,
+                filename => $filename,
+                line     => $line
+            }
+        );
     }
 
-    # Keep a copy of the installed hook so it can be ignored later.
-    $METHODS{$method_name}{'hook'} = *{$method_name}{CODE};
+    ### Saving original method
+    $add_method->(
+        {   stash    => $methods_to_call,
+            method   => $method_to_install,
+            package  => $package,
+            filename => $filename,
+            line     => $line
+        }
+    );
+
+    # Install the hook if there isn't one there aleady.
+    if ( __PACKAGE__ eq _function_package( \&$method_name ) ) {
+
+        ### Ignoring pre-existing multi-method hook.
+    }
+    elsif ( 1 == @$methods_to_call ) {
+
+        ### Installing the single method.
+        *$method_name = $methods_to_call->[0];
+    }
+    elsif ( 1 < @$methods_to_call ) {
+
+        ### Installing the multi-method hook.
+        *$method_name = sub {
+            my ($self) = shift;
+
+            if (wantarray) {
+                return map $self->$_(@_), @$methods_to_call;
+            }
+            elsif ( defined wantarray ) {
+                return join( ' ', map $_->$_(@_), @$methods_to_call );
+            }
+            else {
+                $self->$_(@_) for @$methods_to_call;
+                return;
+            }
+        };
+    }
 
     # Return the method as a convenience (for who knows what, I don't know)
-    return *{$method_name}{CODE};
+    return \&{$method_name};
 }
 
-1;
-__END__
-
-=head1 NAME
-
-Class::CompoundMethods - Create methods from components
-
-=head1 SYNOPSIS
-
-  use Class::CompoundMethods 'append_method';
-
-  # This installs both versioning_hook and auditing_hook into the
-  # method Object::pre_insert.
-  for my $hook (qw(versioning auditing)) {
-      append_method( 'Object::pre_insert', "${hook}_hook" );
-  }
-
-  sub versioning_hook { ... }
-  sub auditing_hook { ... }
-
-=head1 DESCRIPTION
-
-This allows you to install more than one method into a single method name.
-I created this so I could install both versioning and auditing hooks into
-another module's object space. So instead of creating a single larger method
-which incorporates the functionality of both hooks I created
-C<Class::CompoundMethods::append_method> to install a wrapper method as needed.
-
-If only one method is ever installed into a space, it is installed directly
-with no wrapper. If you install more than one then C<append_method> creates a
-wrapper which calls each of the specified methods in turn.
-
-=head1 PUBLIC METHODS
-
-=over 4
-
-=item append_method
-
- append_method( $method_name, $method );                
-
-This function takes two parameters - the fully qualified name of the method
-to install into and the method to install.
-
-C<$method_name> must be the fully qualified method name. This means that for
-the method C<pre_insert> of a C<Foo::Bar> object you must pass in
-
-C<'Foo::Bar::pre_insert'>.
-
-C<$method> may be either a code reference or the fully qualified name of the
-method to use.
-
-=back
-
-=head2 EXAMPLES
-
-=over 4
-
-=item Example 1
-
- use Class::CompoundMethods 'append_method';
-
- # This installs both versioning_hook and auditing_hook into the
- # method Object::pre_insert.
- for my $hook (qw(versioning auditing)) {
-     append_method( 'Object::pre_insert', "${hook}_hook" );
- }
-
- sub versioning_hook { ... }
- sub auditing_hook { ... }
-
-=item Example 2
-
- use Class::CompoundMethods 'append_method';
-
- my @versioned_tables = ( .... );
- my @audited_tables = ( .... );
-
-
- for my $table_list ( { tables => \ @versioned_tables,
-                        prefix => 'versioned' },
-                      { tables => \ @audited_tables,
-                        prefix => 'audited' } ) {
-     my $tables = $table_list->{'tables'};
-     my $prefix = $table_list->{'prefix'};
-
-     for my $table ( @$tables ) {
-         for my $hook ( qw[pre_insert pre_update pre_delete]) {
-
-             my $method_name = "GreenPartyDB::Database::${table}::${hook}";
-             my $method_inst = __PACKAGE__ . "::${prefix}_${hook}";
-             append_method( $method_name, $method_inst );
-
-         }
-     }
- }
-
- sub versioned_pre_insert { ... }
- sub versioned_pre_update { ... }
- sub versioned_pre_delete { ... }
- sub audited_pre_insert { ... }
- sub audited_pre_update { ... }
- sub audited_pre_delete { ... }
-
-=back
-
-=head2 EXPORT
-
-This class optionally exports the C<append_method> function.
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright (c) 2003 Joshua b. Jore
-All rights reserved.
-This program is free software; you can redistribute it and/or modify it
-under the same terms as Perl itself.
-
-=head1 AUTHOR
-
-Joshua b. Jore <jjore@cpan.org>
-
-=head1 SEE ALSO
-
-RFC Class::AppendMethods http://www.perlmonks.org/index.pl?node_id=252199
-
-Installing chained methods http://www.perlmonks.org/index.pl?node_id=251908
-
-=cut
+"Fine!  Since you're too busy playing with people's minds, I'll just go off to the other room to play with myself!";
