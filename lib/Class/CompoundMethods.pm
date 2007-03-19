@@ -20,11 +20,11 @@ Class::CompoundMethods - Create methods from components
 
 =head1 VERSION
 
-0.04
+0.05
 
 =cut
 
-$VERSION = '0.04';
+$VERSION = '0.05';
 
 =pod
 
@@ -279,7 +279,7 @@ sub _x_method {
         ### Context: $cx
     }
 
-    no strict 'refs';
+    no strict 'refs';    ## no critic
     local $^W;
 
     # If the method name isn't qualified then I assume it exists in the

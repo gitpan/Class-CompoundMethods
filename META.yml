@@ -1,17 +1,17 @@
----
-name: Class-CompoundMethods
-version: 0.04
+--- #YAML:1.0
+name:                Class-CompoundMethods
+version:             0.05
+abstract:            Create methods from components
+license:             ~
+generated_by:        ExtUtils::MakeMaker version 6.31
+distribution_type:   module
+requires:     
+    B:                             0
+    Exporter:                      0
+    strict:                        0
+    vars:                          0
+meta-spec:
+    url:     http://module-build.sourceforge.net/META-spec-v1.2.html
+    version: 1.2
 author:
-  - '"Joshua ben Jore" <jjore@cpan.org>'
-abstract: Create methods from components
-license: perl
-requires:
-  B: 0
-  Exporter: 0
-  strict: 0
-  vars: 0
-provides:
-  Class::CompoundMethods:
-    file: lib/Class/CompoundMethods.pm
-    version: 0.04
-generated_by: Module::Build version 0.2611
+    - Joshua ben Jore <jjore@cpan.org>

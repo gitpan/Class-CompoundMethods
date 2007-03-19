@@ -16,3 +16,7 @@ Revision history for Perl extension Class::CompoundMethods.
 0.04  Wed Nov 23, 2005
         - Added t/03yaml.t
         - Fixed META.yml syntax
+0.05  Mon Mar 19, 2007
+        - Removed Module::Build
+        - Removed signature
+        - Removed authoring stuff.
